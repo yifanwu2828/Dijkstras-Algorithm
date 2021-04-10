@@ -1,0 +1,5 @@
+numpy
+matplotlib
+gym
+gym_minigrid
+imageio
