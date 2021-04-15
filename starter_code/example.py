@@ -1,5 +1,7 @@
 import numpy as np
 import gym
+from pprint import pprint
+
 from utils import *
 
 MF = 0  # Move Forward
@@ -22,7 +24,7 @@ def example_use_of_gym_env():
 
     env, info = load_env('./envs/doorkey-8x8-shortcut.env')
     print('<Environment Info>\n')
-    print(info)  # Map size
+    pprint(info)  # Map size
     # agent initial position & direction,
     # key position, door position, goal position
     print('<================>\n')
@@ -67,4 +69,4 @@ def example_use_of_gym_env():
         print("Reached Goal")
 
     # The number of steps so far
-    print('Step Count: {env.step_count}')
+    print(f'Step Count: {env.step_count}')

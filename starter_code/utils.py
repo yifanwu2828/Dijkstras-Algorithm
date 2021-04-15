@@ -1,6 +1,8 @@
 import os
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Sequence, Iterable
 import time
+import re
+from pprint import pprint
 
 import numpy as np
 import gym
@@ -46,14 +48,44 @@ def toc(t_start: float, name: Optional[str] = "Operation", ftime=False) -> None:
 
 ########################################################################################
 
-def step_cost(action):
+def fetch_env_dict(env_folder: str = './envs', verbose=False):
+    """
+    :param env_folder: folder contain .env files
+    :param verbose: show msg
+    return env_dict
+    """
+    assert isinstance(env_folder, str)
+    assert os.path.isdir(env_folder)
+    env_path_lst = [
+        os.path.join(env_folder, env_file) for env_file in sorted(os.listdir(env_folder))
+        if os.path.isfile(os.path.join(env_folder, env_file))
+    ]
+    path_dic = {}
+    for path in env_path_lst:
+        frac = re.split('[.-]', path)
+        name = frac[2] + '-' + frac[3]
+        path_dic[name] = path
+    if verbose:
+        pprint(path_dic)
+    return path_dic
+
+
+########################################################################################
+
+def step_cost(action: int):
+    """
+    stage cost
+    :param action:
+    :return cost of action
+    """
+    # TODO:
     # You should implement the stage cost by yourself
     # Feel free to use it or not
     # ************************************************
     return 0  # the cost of action
 
 
-def step(env, action):
+def step(env, action: int):
     """
     Take Action
     ----------------------------------
@@ -76,7 +108,7 @@ def step(env, action):
     return step_cost(action), done
 
 
-def generate_random_env(seed, task):
+def generate_random_env(seed, task: str):
     """
     Generate a random environment for testing
     -----------------------------------------
@@ -90,45 +122,54 @@ def generate_random_env(seed, task):
     """
     if seed < 0:
         seed = np.random.randint(50)
+
+    # Seed python RNG
+    random.seed(seed)
+
+    # Seed numpy RNG
+    np.random.seed(seed)
+
     env = gym.make(task)
     env.seed(seed)
     env.reset()
     return env
 
 
-def load_env(path):
+def load_env(path: str):
     """
     Load Environments
     ---------------------------------------------
     Returns:
         gym-environment, info
     """
-    with open(path, 'rb') as f:
-        env = pickle.load(f)
-    
+    if os.path.isfile(path):
+        with open(path, 'rb') as f:
+            env = pickle.load(f)
+    else:
+        raise ValueError("File not Found!!")
+
     info = {
         'height': env.height,
         'width': env.width,
         'init_agent_pos': env.agent_pos,
         'init_agent_dir': env.dir_vec
-        }
+    }
     
     for i in range(env.height):
         for j in range(env.width):
-            if isinstance(env.grid.get(j, i),
-                          gym_minigrid.minigrid.Key):
+            if isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Key):
                 info['key_pos'] = np.array([j, i])
-            elif isinstance(env.grid.get(j, i),
-                            gym_minigrid.minigrid.Door):
+
+            elif isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Door):
                 info['door_pos'] = np.array([j, i])
-            elif isinstance(env.grid.get(j, i),
-                            gym_minigrid.minigrid.Goal):
+
+            elif isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Goal):
                 info['goal_pos'] = np.array([j, i])    
             
     return env, info
 
 
-def load_random_env(env_folder):
+def load_random_env(env_folder: str):
     """
     Load a random DoorKey environment
     ---------------------------------------------
@@ -137,9 +178,12 @@ def load_random_env(env_folder):
     """
     env_list = [os.path.join(env_folder, env_file) for env_file in os.listdir(env_folder)]
     env_path = random.choice(env_list)
-    with open(env_path, 'rb') as f:
-        env = pickle.load(f)
-    
+    if os.path.isfile(env_path):
+        with open(env_path, 'rb') as f:
+            env = pickle.load(f)
+    else:
+        raise ValueError("File not Found!!")
+
     info = {
         'height': env.height,
         'width': env.width,
@@ -151,24 +195,21 @@ def load_random_env(env_folder):
     
     for i in range(env.height):
         for j in range(env.width):
-            if isinstance(env.grid.get(j, i),
-                          gym_minigrid.minigrid.Key):
+            if isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Key):
                 info['key_pos'] = np.array([j, i])
-            elif isinstance(env.grid.get(j, i),
-                            gym_minigrid.minigrid.Door):
+            elif isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Door):
                 info['door_pos'].append(np.array([j, i]))
                 if env.grid.get(j, i).is_open:
                     info['door_open'].append(True)
                 else:
                     info['door_open'].append(False)
-            elif isinstance(env.grid.get(j, i),
-                            gym_minigrid.minigrid.Goal):
+            elif isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Goal):
                 info['goal_pos'] = np.array([j, i])    
             
     return env, info, env_path
 
 
-def save_env(env, path):
+def save_env(env, path: str):
     """ Save env"""
     with open(path, 'wb') as f:
         pickle.dump(env, f)
@@ -185,7 +226,7 @@ def plot_env(env):
     plt.show()
 
 
-def draw_gif_from_seq(seq, env, path='./gif/doorkey.gif'):
+def draw_gif_from_seq(seq: Sequence[int], env, path: str = './gif/doorkey.gif'):
     """
     Save gif with a given action sequence
     ----------------------------------------
@@ -202,6 +243,6 @@ def draw_gif_from_seq(seq, env, path='./gif/doorkey.gif'):
             img = env.render('rgb_array', tile_size=32)
             step(env, act)
             writer.append_data(img)
-    print('GIF is written to {path}')
+    print(f'GIF is written to {path}')
     return
 
