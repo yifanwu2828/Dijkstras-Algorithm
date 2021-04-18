@@ -1,6 +1,6 @@
 import argparse
-from typing import List, Tuple, Dict, Union, Optional
-from collections import namedtuple, OrderedDict
+from typing import Union
+from collections import namedtuple, deque
 from functools import lru_cache
 import os
 from pprint import pprint
@@ -8,26 +8,24 @@ import random
 
 import numpy as np
 import gym
+from gym_minigrid import minigrid
 from gym_minigrid.minigrid import MiniGridEnv, Door, Wall, Key, Goal
 
 try:
     from icecream import ic
+    from icecream import install
+
+    install()
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-try:
-    from icecream import install
-    install()
-except ImportError:
-    pass
 
 import utils
-from example import example_use_of_gym_env
 
 Action = namedtuple('Action', ['MF', 'TL', 'TR', 'PK', 'UD'])
 act = Action(0, 1, 2, 3, 4)
+
 act_dict = act._asdict()
-
-
+inv_dict = {v: k for k, v in act_dict.items()}
 # {
 #     MF: 0,  # Move Forward
 #     TL: 1,  # Turn Left
@@ -35,38 +33,13 @@ act_dict = act._asdict()
 #     PK: 3,  # Pickup Key
 #     UD: 4,  # Unlock Door
 # }
-
-def agent_status(env: MiniGridEnv):
-    """ Get Agent Status (position, direction, front cell) """
-    # Get the agent position
-    agent_position = env.agent_pos
-    # Get the agent direction
-    agent_direction = env.dir_vec  # or env.agent_dir
-    # Get the cell in front of the agent
-    front_cell = env.front_pos  # agent_pos + agent_dir
-    return agent_position, agent_direction, front_cell
+front_cell_type: Union[Door, Wall, Key, Goal, None]
 
 
-def door_status(env: MiniGridEnv):
-    """ Get Door status (open or locked) """
-    # Get the door status
-    env_door: Door = env.grid.get(info['door_pos'][0], info['door_pos'][1])
-    return env_door.is_open, env_door.is_locked
-
-
-def doorkey_problem(env: MiniGridEnv):
+def doorkey_5x5_normal(env: MiniGridEnv):
     """
     You are required to find the optimal path in
         doorkey-5x5-normal.env
-        doorkey-6x6-normal.env
-        doorkey-8x8-normal.env
-        
-        doorkey-6x6-direct.env
-        doorkey-8x8-direct.env
-        
-        doorkey-6x6-shortcut.env
-        doorkey-8x8-shortcut.env
-        
     Feel Free to modify this function
     """
     # optim_act_seq = [TL, MF, PK, TL, UD, MF, MF, MF, MF, TR, MF]
@@ -74,8 +47,70 @@ def doorkey_problem(env: MiniGridEnv):
     pass
 
 
+def obstacle_path(grid: np.ndarray, init_pos: np.ndarray, destination: np.ndarray):
+    """
+
+    return distance to goal
+    """
+    M, N = grid.shape
+    assert 0 <= init_pos[0] < M and 0 <= init_pos[1] < N
+    visited = set()
+    directions = [
+        [1, 0],  # right
+        [0, 1],  # down
+        [-1, 0],  # left
+        [0, -1],  # up
+    ]
+    q = deque()
+    # row, col, distance
+    if grid[init_pos[0], init_pos[1]] == 0:
+        q.append([init_pos[0], init_pos[1], 0])
+        visited.add((init_pos[0], init_pos[1]))
+    else:
+        return -1
+
+    while len(q) > 0:
+        c_row, c_col, c_dist = q.popleft()
+        if c_row == destination[0] and c_col == destination[1]:
+            return c_dist
+
+        if grid[c_row, c_col] == 1:
+            continue
+        for direction in directions:
+            nxt_row, nxt_col = c_row + direction[0], c_col + direction[1]
+            if 0 <= nxt_row < M and 0 <= nxt_col < N and (nxt_row, nxt_col) not in visited:
+                q.append([nxt_row, nxt_col, c_dist + 1])
+                visited.add((nxt_row, nxt_col))
+    return -1
+
+
+# def surround_cells(grid, pos):
+#     r, c = pos[0], pos[1]
+#     # up
+#     grid[r, c-1]
+#     # right
+#     grid[r+1, c]
+#     # down
+#     grid[r, c+1]
+#     # left
+#     grid[r-1, c]
+
+
 def main():
-    """"""
+    """
+    You are required to find the optimal path in
+        doorkey-5x5-normal.env
+        doorkey-6x6-normal.env
+        doorkey-8x8-normal.env
+
+        doorkey-6x6-direct.env
+        doorkey-8x8-direct.env
+
+        doorkey-6x6-shortcut.env
+        doorkey-8x8-shortcut.env
+
+    Feel Free to modify this function
+    """
     '''
     def partA():
         env_folder = './envs'
@@ -89,6 +124,7 @@ def main():
         env_folder = './envs/random_envs'
         env, info, env_path = utils.load_random_env(env_folder)
     '''
+    # world_grid = minigrid.Grid.encode(env.grid)[:, :, 0].T.astype(np.float32), 1 is colormap, 2 state
     pass
 
 
@@ -103,8 +139,11 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
+    ############################
+    # Config
     TEST = args.test
-    VERBOSE = args.verbose
+    # VERBOSE = args.verbose
+    VERBOSE = False
     seed = args.seed
     env_folder = args.folder
 
@@ -114,10 +153,12 @@ if __name__ == '__main__':
         # set overflow warning to error instead
         np.seterr(all='raise')
 
+    ############################
     # Seed python and numpy RNG
     random.seed(seed)
     np.random.seed(seed)
 
+    ############################
     # Obtain env path
     env_dict = utils.fetch_env_dict(env_folder, verbose=VERBOSE)
     env, info = utils.load_env(env_dict["5x5-normal"])
@@ -131,30 +172,58 @@ if __name__ == '__main__':
         print('<===========================>')
         # Visualize the environment
         utils.plot_env(env)
+    utils.plot_env(env)
+    ############################
+    # dimension
+    height, width = info['height'], info['width']
+    # agent info
+    init_agent_pos, init_agent_dir, init_front_pos, init_front_type = utils.init_agent_status(env, info)
+    init_agent_pos = np.flip(init_agent_pos)
+    init_agent_dir = np.flip(init_agent_dir)
+    init_front_pos = np.flip(init_front_pos)
 
-    agent_pos, agent_dir, front_cell = agent_status(env)
-    door = env.grid.get(info['door_pos'][0], info['door_pos'][1])
-    is_open, is_locked = door_status(env)
-
-
-    # Access the cell at coord: (2,3)
-    cell: Union[Door, Wall, Key, Goal, None] = env.grid.get(3, 3)  # NoneType, Door, Wall, Key, Goal
-
-    ic(cell)
-    ic(agent_pos)
-    ic(agent_dir)
-    ic(front_cell)
-    ic(door)
-    ic(is_open)
-    ic(is_locked)
-
+    # door info
+    env_door, init_door_pos, is_locked = utils.init_door_status(env, info)
+    init_door_pos = np.flip(init_door_pos)
+    # key info
+    key_pos = info['key_pos']
     # Determine whether agent is carrying a key
     is_carrying = env.carrying is not None
-    ic(is_carrying)
+    # goal info
+    goal_pos = info['goal_pos']
+    ############################
+    # Map of object type to integers
+    OBJECT_TO_IDX = {
+        'empty': 1,
+        'wall': 2,
+        'door': 4,
+        'key': 5,
+        'goal': 8,
+        'agent': 10,
+    }
+    # init map
+    world_grid = minigrid.Grid.encode(env.grid)[:, :, 0].T  # .astype(np.float64)
+    # print(world_grid)
+    # update map
+    # door open or door close
 
-    cost, done = utils.step(env, act.MF)
-    # Determine whether we stepped into the goal
-    if done:
-        ic("Reached Goal")
-    # The number of steps so far
-    print(f'Step Count: {env.step_count}')
+
+    cost_grid = np.where(world_grid != OBJECT_TO_IDX['wall'], world_grid, np.inf)
+    ic(world_grid)
+
+    binary_grid = np.where(world_grid != OBJECT_TO_IDX['wall'], 0, 1).astype("uint8")
+    binary_grid[init_door_pos[0], init_door_pos[1]] = is_locked
+    ic(binary_grid)
+
+    dist_goal = obstacle_path(grid=binary_grid, init_pos=init_agent_pos, destination=goal_pos)
+    dist_key = obstacle_path(grid=binary_grid, init_pos=init_agent_pos, destination=key_pos)
+
+    if dist_goal != -1:
+        pass
+    if dist_key != -1:
+        # if door close, shortest pass to key, then shortest pass from key to goal
+        pass
+    else:
+        print("No Path Found!!")
+    ic(dist_goal)
+    ic(dist_key)

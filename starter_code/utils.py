@@ -1,18 +1,24 @@
+from typing import List, Tuple, Dict, Union, Optional, Sequence, Iterable
 import os
-from typing import List, Tuple, Dict, Optional, Sequence, Iterable
-import time
 import re
+import time
+import pickle
 from pprint import pprint
+from collections import namedtuple
 
 import numpy as np
 import gym
 import gym_minigrid
-import pickle
+from gym_minigrid.minigrid import MiniGridEnv, Door, Wall, Key, Goal
+
 import matplotlib.pyplot as plt
 import imageio
 import random
 
 
+Action = namedtuple('Action', ['MF', 'TL', 'TR', 'PK', 'UD'])
+act = Action(0, 1, 2, 3, 4)
+act_dict = act._asdict()
 MF = 0  # Move Forward
 TL = 1  # Turn Left
 TR = 2  # Turn Right
@@ -56,10 +62,12 @@ def fetch_env_dict(env_folder: str = './envs', verbose=False):
     """
     assert isinstance(env_folder, str)
     assert os.path.isdir(env_folder)
-    env_path_lst = [
-        os.path.join(env_folder, env_file) for env_file in sorted(os.listdir(env_folder))
-        if os.path.isfile(os.path.join(env_folder, env_file))
-    ]
+    env_path_lst = sorted(
+        [
+            os.path.join(env_folder, env_file) for env_file in os.listdir(env_folder)
+            if os.path.isfile(os.path.join(env_folder, env_file))
+        ]
+    )
     path_dic = {}
     for path in env_path_lst:
         frac = re.split('[.-]', path)
@@ -70,22 +78,86 @@ def fetch_env_dict(env_folder: str = './envs', verbose=False):
     return path_dic
 
 
-########################################################################################
+########################################
+########################################
+def init_agent_status(env, info: dict):
+    """
+    Get Init Agent Status (position, direction, front cell)
+    """
+    init_agent_pos = info['init_agent_pos']
+    init_agent_dir = info['init_agent_dir']
+    init_front_pos = init_agent_pos + init_agent_dir
+    # Front type
+    init_front_type = env.grid.get(init_front_pos[0], init_front_pos[1])
+    ic(init_agent_pos)
+    ic(init_agent_dir)
+    ic(init_front_pos)
+    ic(init_front_type)
+    return init_agent_pos, init_agent_dir, init_front_pos, init_front_type
 
-def step_cost(action: int):
+
+def init_door_status(env: MiniGridEnv, info: dict):
+    """ Get Init Door Status (open or locked) """
+    init_door_pos = info['door_pos']
+    env_door: Door = env.grid.get(init_door_pos[0], init_door_pos[1])
+    is_locked: int
+    if env_door.is_open:
+        is_locked = 0
+    elif env_door.is_locked:
+        is_locked = 1
+    else:  # door condition is unknown
+        is_locked = -1
+    ic(init_door_pos)
+    ic(is_locked)
+    return env_door, init_door_pos, is_locked
+
+
+########################################
+########################################
+
+def step_cost(env, action: int):
     """
     stage cost
+    :param env:
     :param action:
     :return cost of action
     """
-    # TODO:
-    # You should implement the stage cost by yourself
-    # Feel free to use it or not
-    # ************************************************
-    return 0  # the cost of action
+    assert isinstance(action, int), "action should be integer"
+    assert 0 <= action <= 4, "action should in [0, 4]"
+
+    front_cell_type: Union[Door, Wall, Key, Goal, None]
+
+    state_cost = {
+        "None": 0,
+        "Wall": np.inf,
+        "Goal": 0
+    }
+    action_cost = {
+        "MF": 1,
+        "TL": 1,
+        "TR": 1,
+        "PK": 1,
+        "UD": 1
+    }
+    # Get the cell in front of the agent
+    front_cell_pos = env.front_pos  # agent_pos + agent_dir
+
+    if action == act.MF:
+        front_cell_type = env.grid.get(front_cell_pos[0], front_cell_pos[1])
+        cost = action_cost["MF"]
+        if isinstance(front_cell_type, Wall):
+            cost += state_cost["Wall"]
+        elif isinstance(front_cell_type, Goal):
+            cost += state_cost["Goal"]
+        else:
+            cost += state_cost["None"]
+    else:
+        cost = 1
+    ic(cost)
+    return cost
 
 
-def step(env, action: int):
+def step(env, action: int, render=False, verbose=False):
     """
     Take Action
     ----------------------------------
@@ -105,7 +177,25 @@ def step(env, action: int):
     }
 
     _, _, done, _ = env.step(actions[action])
-    return step_cost(action), done
+
+    # Get the cell in front of the agent
+    front_cell_pos = env.front_pos  # agent_pos + agent_dir
+    front_cell_type = env.grid.get(front_cell_pos[0], front_cell_pos[1])
+    if isinstance(front_cell_type, Wall):
+        msg = 'Wall'
+    elif isinstance(front_cell_type, Goal):
+        msg = "Goal"
+    elif isinstance(front_cell_type, Door):
+        msg = "Door"
+    elif isinstance(front_cell_type, Key):
+        msg = "Key"
+    else:
+        msg = "None"
+    print(f"Front Cell: {msg}")
+    ic(done)
+    if render:
+        plot_env(env)
+    return step_cost(env, action), done
 
 
 def generate_random_env(seed, task: str):
