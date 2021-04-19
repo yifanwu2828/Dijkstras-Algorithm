@@ -1,6 +1,6 @@
 import argparse
 from typing import Union
-from collections import namedtuple, deque
+from collections import namedtuple
 from functools import lru_cache
 import os
 from pprint import pprint
@@ -45,55 +45,6 @@ def doorkey_5x5_normal(env: MiniGridEnv):
     # optim_act_seq = [TL, MF, PK, TL, UD, MF, MF, MF, MF, TR, MF]
     # return optim_act_seq
     pass
-
-
-def obstacle_path(grid: np.ndarray, init_pos: np.ndarray, destination: np.ndarray):
-    """
-
-    return distance to goal
-    """
-    M, N = grid.shape
-    assert 0 <= init_pos[0] < M and 0 <= init_pos[1] < N
-    visited = set()
-    directions = [
-        [1, 0],  # right
-        [0, 1],  # down
-        [-1, 0],  # left
-        [0, -1],  # up
-    ]
-    q = deque()
-    # row, col, distance
-    if grid[init_pos[0], init_pos[1]] == 0:
-        q.append([init_pos[0], init_pos[1], 0])
-        visited.add((init_pos[0], init_pos[1]))
-    else:
-        return -1
-
-    while len(q) > 0:
-        c_row, c_col, c_dist = q.popleft()
-        if c_row == destination[0] and c_col == destination[1]:
-            return c_dist
-
-        if grid[c_row, c_col] == 1:
-            continue
-        for direction in directions:
-            nxt_row, nxt_col = c_row + direction[0], c_col + direction[1]
-            if 0 <= nxt_row < M and 0 <= nxt_col < N and (nxt_row, nxt_col) not in visited:
-                q.append([nxt_row, nxt_col, c_dist + 1])
-                visited.add((nxt_row, nxt_col))
-    return -1
-
-
-# def surround_cells(grid, pos):
-#     r, c = pos[0], pos[1]
-#     # up
-#     grid[r, c-1]
-#     # right
-#     grid[r+1, c]
-#     # down
-#     grid[r, c+1]
-#     # left
-#     grid[r-1, c]
 
 
 def main():
@@ -162,6 +113,12 @@ if __name__ == '__main__':
     # Obtain env path
     env_dict = utils.fetch_env_dict(env_folder, verbose=VERBOSE)
     env, info = utils.load_env(env_dict["5x5-normal"])
+    # env, info = utils.load_env(env_dict["6x6-direct"])
+    # env, info = utils.load_env(env_dict["6x6-normal"])
+    # env, info = utils.load_env(env_dict["6x6-shortcut"])
+    # env, info = utils.load_env(env_dict["8x8-direct"])
+    # env, info = utils.load_env(env_dict["8x8-normal"])
+    # env, info = utils.load_env(env_dict["8x8-shortcut"])
 
     if VERBOSE:
         print('\n<=====Environment Info =====>')
@@ -204,26 +161,15 @@ if __name__ == '__main__':
     # init map
     world_grid = minigrid.Grid.encode(env.grid)[:, :, 0].T  # .astype(np.float64)
     # print(world_grid)
-    # update map
-    # door open or door close
 
 
-    cost_grid = np.where(world_grid != OBJECT_TO_IDX['wall'], world_grid, np.inf)
-    ic(world_grid)
 
-    binary_grid = np.where(world_grid != OBJECT_TO_IDX['wall'], 0, 1).astype("uint8")
-    binary_grid[init_door_pos[0], init_door_pos[1]] = is_locked
-    ic(binary_grid)
-
-    dist_goal = obstacle_path(grid=binary_grid, init_pos=init_agent_pos, destination=goal_pos)
-    dist_key = obstacle_path(grid=binary_grid, init_pos=init_agent_pos, destination=key_pos)
-
-    if dist_goal != -1:
-        pass
-    if dist_key != -1:
-        # if door close, shortest pass to key, then shortest pass from key to goal
-        pass
-    else:
-        print("No Path Found!!")
-    ic(dist_goal)
-    ic(dist_key)
+    # if dist_goal != -1:
+    #     pass
+    # if dist_key != -1:
+    #     # if door close, shortest pass to key, then shortest pass from key to goal
+    #     pass
+    # else:
+    #     print("No Path Found!!")
+    # ic(dist_goal)
+    # ic(dist_key)
