@@ -280,10 +280,10 @@ def find_shortest_path(
     e = tuple(e)
     # If shortest dist is inf -> no path found
     if dist[e] == np.inf:
-        print("No Path Found!")
+        # print("No Path Found!")
         return path
 
-    # path.append(e)
+    path.append(e)
     # Exhaust to reconstruct reverse path
     while True:
         pre = prev_grid[e]
@@ -297,7 +297,10 @@ def find_shortest_path(
     return path
 
 
-def action_recon(path: List[Tuple[int]], init_dir: np.ndarray):
+def action_recon(
+        path: List[Tuple[int]],
+        init_dir: np.ndarray
+) -> Tuple[List[int], List[Tuple[str, np.ndarray]], List[int]]:
     """
     Reconstruct the Action Sequence from Path
     :param path: list of agent path
@@ -311,18 +314,25 @@ def action_recon(path: List[Tuple[int]], init_dir: np.ndarray):
         "left":  np.array([0, -1], dtype=np.int8),
         "right": np.array([0, 1], dtype=np.int8),
     }
-    inv_dir_dict = {tuple(v): k for k, v in directions.items()}
-    act_seq = []
+    inv_dir_dict: Dict[tuple, str] = {tuple(v): k for k, v in directions.items()}
+    act_seq: List[int] = []
+    dir_seq: List[Tuple[str, np.ndarray]] = []
+    cost_seq: List[int] = []
+    act_cost = None
+
+    # Record initial agent_dir name and value
+    for k, v in directions.items():
+        if np.allclose(init_dir, v):
+            dir_seq.append((k, v))
 
     c_dir = init_dir
     for i in range(1, len(path)):
         c_cell = np.array(path[i-1], dtype=np.int8)
         nxt_cell = np.array(path[i], dtype=np.int8)
         nxt_dir = nxt_cell - c_cell
-        # ic(nxt_dir)
 
         name = inv_dir_dict[tuple(nxt_dir)]
-        # ic(name)
+        dir_seq.append((name, nxt_dir))
 
         # UP
         if c_dir[0] == directions['up'][0] and c_dir[1] == directions['up'][1]:
@@ -391,10 +401,14 @@ def action_recon(path: List[Tuple[int]], init_dir: np.ndarray):
                 act_cost = 0
             else:
                 raise KeyError
+        # Append rotation cost
+        cost_seq.append(act_cost)
         c_dir = nxt_dir
         act_seq.append(act.MF)
+        # Append move forward cost
+        cost_seq.append(1)
 
-    return act_seq
+    return act_seq, dir_seq, cost_seq
 ########################################
 ########################################
 
@@ -510,20 +524,27 @@ def load_env(path: str):
         'height': env.height,
         'width': env.width,
         'init_agent_pos': env.agent_pos,
-        'init_agent_dir': env.dir_vec
+        'init_agent_dir': env.dir_vec,
+        'door_pos': [],
+        'door_open': [],
     }
-    
+
     for i in range(env.height):
         for j in range(env.width):
-            if isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Key):
+            if isinstance(env.grid.get(j, i),
+                          gym_minigrid.minigrid.Key):
                 info['key_pos'] = np.array([j, i])
-
-            elif isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Door):
+            elif isinstance(env.grid.get(j, i),
+                            gym_minigrid.minigrid.Door):
                 info['door_pos'] = np.array([j, i])
+                if env.grid.get(j, i).is_open:
+                    info['door_open'].append(True)
+                else:
+                    info['door_open'].append(False)
+            elif isinstance(env.grid.get(j, i),
+                            gym_minigrid.minigrid.Goal):
+                info['goal_pos'] = np.array([j, i])
 
-            elif isinstance(env.grid.get(j, i), gym_minigrid.minigrid.Goal):
-                info['goal_pos'] = np.array([j, i])    
-            
     return env, info
 
 
