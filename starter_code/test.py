@@ -25,10 +25,22 @@ inv_act_dict = {v: k for k, v in act_dict.items()}
 #     PK: 3,  # Pickup Key
 #     UD: 4,  # Unlock Door
 # }
+# Map of object type to integers
+OBJECT_TO_IDX = {
+    'empty': 1,
+    'wall': 2,
+    'door': 4,
+    'key': 5,
+    'goal': 8,
+    'agent': 10,
+}
 front_cell_type: Union[Door, Wall, Key, Goal, None]
 
 
-
+def doorkey(env: MiniGridEnv, info: dict):
+    """
+    """
+    pass
 
 
 
@@ -65,8 +77,8 @@ if __name__ == '__main__':
     ############################
     # Obtain env path
     env_dict = utils.fetch_env_dict(env_folder, verbose=VERBOSE)
-    # env, info = utils.load_env(env_dict["5x5-normal"])
-    env, info = utils.load_env(env_dict["6x6-direct"])
+    env, info = utils.load_env(env_dict["5x5-normal"])
+    # env, info = utils.load_env(env_dict["6x6-direct"])
     # env, info = utils.load_env(env_dict["6x6-normal"])
     # env, info = utils.load_env(env_dict["6x6-shortcut"])
     # env, info = utils.load_env(env_dict["8x8-direct"])
@@ -74,9 +86,7 @@ if __name__ == '__main__':
     # env, info = utils.load_env(env_dict["8x8-shortcut"])
     if VERBOSE:
         print('\n<=====Environment Info =====>')
-        ic(env.mission)
-        # agent initial position & direction,
-        # key position, door position, goal position
+        print(env.mission)
         pprint(info)  # Map size
         print('<===========================>')
         # Visualize the environment
@@ -84,23 +94,14 @@ if __name__ == '__main__':
     utils.plot_env(env)
     ############################
     ############################
-    # dimension
-    height, width = info['height'], info['width']
+    # doorkey(env, info)
     # agent info
     init_agent_pos, init_agent_dir, init_front_pos, init_front_type = utils.init_agent_status(env, info)
     init_agent_pos = np.flip(init_agent_pos)
     init_agent_dir = np.flip(init_agent_dir)
-    init_front_pos = np.flip(init_front_pos)
-    ic(init_agent_pos)
-    ic(init_agent_dir)
-    ic(init_front_pos)
-    ic(init_front_type)
-
     # door info
     env_door, init_door_pos, is_locked = utils.init_door_status(env, info)
     init_door_pos = np.flip(init_door_pos)
-    ic(init_door_pos)
-    ic(is_locked)
 
     # key info
     key_pos = info['key_pos']
@@ -113,31 +114,49 @@ if __name__ == '__main__':
     goal_pos = info['goal_pos']
     goal_pos = np.flip(goal_pos)
     ############################
-    # Map of object type to integers
-    OBJECT_TO_IDX = {
-        'empty': 1,
-        'wall': 2,
-        'door': 4,
-        'key': 5,
-        'goal': 8,
-        'agent': 10,
-    }
+
     # init map
     world_grid = minigrid.Grid.encode(env.grid)[:, :, 0].T
-    # ic(world_grid)
 
     binary_grid = np.where(world_grid != OBJECT_TO_IDX['wall'], 0, 1).astype("uint8")
     binary_grid[init_door_pos[0], init_door_pos[1]] = is_locked
-    binary_grid[init_door_pos[0], init_door_pos[1]] = is_locked
 
-    distance, prev = utils.dijkstra(s=init_agent_pos, grid=binary_grid, direction=init_agent_dir)
-    ic(distance)
+    dist_from_start, prev = utils.dijkstra(s=init_agent_pos, grid=binary_grid, direction=init_agent_dir)
+    ic(dist_from_start)
     ic(prev)
 
-    path_recon = utils.find_shortest_path(s=init_agent_pos, e=(4, 2), grid=binary_grid, direction=init_agent_dir)
+    # Check if direct path exist
+    dist2goal = dist_from_start[tuple(goal_pos)]
+    dist2key = dist_from_start[tuple(key_pos)]
+
+    binary_grid_open = binary_grid.copy()
+    binary_grid_open[init_door_pos[0], init_door_pos[1]] = 0
+    binary_grid_open[key_pos[0], key_pos[1]] = 0
+    dist_from_key, _ = utils.dijkstra(s=key_pos, grid=binary_grid_open, direction=init_agent_dir)
+
+    # TODO: get key act seq and open door seq and their cost
+    key2door = dist_from_key[tuple(init_door_pos)]
+    dist_from_door, _ = utils.dijkstra(s=init_door_pos, grid=binary_grid_open, direction=init_agent_dir)
+    door2goal = dist_from_door[tuple(goal_pos)]
+    ic(dist2goal)
+    ic(dist2key)
+    ic(key2door)
+    ic(door2goal)
+    start2key2goal = dist2key + key2door + door2goal
+    ic(start2key2goal)
+
+    #     # if door close, shortest pass to key, then shortest pass from key to goal
+    #     pass
+    # else:
+    #     print("No Path Found!!")
+
+    path_recon = utils.find_shortest_path(s=init_agent_pos, e=goal_pos, grid=binary_grid, direction=init_agent_dir)
     ic(path_recon)
 
     act_seq = utils.action_recon(path=path_recon, init_dir=init_agent_dir)
-    # ic(act_seq)
-    actname_seq = [inv_act_dict[i] for i in act_seq]
-    ic(actname_seq)
+    act_name_seq = [inv_act_dict[i] for i in act_seq]
+    ic(act_seq)
+    ic(act_name_seq)
+
+    # for ac in act_seq:
+    #     utils.step(env, action=ac, render=True, verbose=True)
