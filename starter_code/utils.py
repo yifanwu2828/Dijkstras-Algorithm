@@ -57,7 +57,7 @@ def toc(t_start: float, name: Optional[str] = "Operation", ftime=False) -> None:
 
 ########################################################################################
 
-def fetch_env_dict(env_folder: str = './envs', verbose=False):
+def fetch_env_dict(env_folder: str = './envs', verbose=False) -> Dict[str, str]:
     """
     :param env_folder: folder contain .env files
     :param verbose: show msg
@@ -83,7 +83,7 @@ def fetch_env_dict(env_folder: str = './envs', verbose=False):
 
 ########################################
 ########################################
-def init_agent_status(env, info: dict):
+def init_agent_status(env: MiniGridEnv, info: dict):
     """
     Get Init Agent Status (position, direction, front cell)
     """
@@ -95,7 +95,7 @@ def init_agent_status(env, info: dict):
     return init_agent_pos, init_agent_dir, init_front_pos, init_front_type
 
 
-def init_door_status(env: MiniGridEnv, info: dict):
+def init_door_status(env: MiniGridEnv, info: dict) -> Tuple[Door, np.ndarray, int]:
     """ Get Init Door Status (open or locked) """
     init_door_pos = info['door_pos']
     env_door: Door = env.grid.get(init_door_pos[0], init_door_pos[1])
@@ -111,7 +111,11 @@ def init_door_status(env: MiniGridEnv, info: dict):
 
 ########################################
 ########################################
-def fetch_neighbor_cells(pos: Union[tuple, np.ndarray], grid: np.ndarray, c_dir: np.ndarray):
+def fetch_neighbor_cells(
+        pos: Union[tuple, np.ndarray],
+        grid: np.ndarray,
+        c_dir: np.ndarray
+) -> Tuple[List[Tuple[int, int]], List[int], List[np.ndarray]]:
     """
     Valid neighbor cells
     :param pos: current position
@@ -119,18 +123,21 @@ def fetch_neighbor_cells(pos: Union[tuple, np.ndarray], grid: np.ndarray, c_dir:
     :param c_dir: agent's dir_vec
     :return valid adjacent cells (4-connectivity)
     """
+    assert isinstance(grid, np.ndarray)
+    assert isinstance(pos, np.ndarray) or isinstance(pos, tuple) or isinstance(pos, list)
+    assert len(pos) == 2
+    assert isinstance(c_dir, np.ndarray)
     M, N = grid.shape
     assert 0 <= pos[0] < M and 0 <= pos[1] < N
     directions = {
-        "up": np.array([-1, 0], dtype=np.int8),  # up
-        "down": np.array([1, 0], dtype=np.int8),  # down
-        "left": np.array([0, -1], dtype=np.int8),  # left
-        "right": np.array([0, 1], dtype=np.int8),  # right
+        "up": np.array([-1, 0], dtype=np.int8),
+        "down": np.array([1, 0], dtype=np.int8),
+        "left": np.array([0, -1], dtype=np.int8),
+        "right": np.array([0, 1], dtype=np.int8),
     }
-    c_row, c_col = pos
-    cell_lst = []
-    cost_lst=[]
-    dir_lst = []
+    c_row: int = pos[0]
+    c_col: int = pos[1]
+    cell_lst, cost_lst, dir_lst = [], [], []
     act_cost = None
 
     for name in directions.keys():
@@ -187,21 +194,24 @@ def fetch_neighbor_cells(pos: Union[tuple, np.ndarray], grid: np.ndarray, c_dir:
             else:
                 raise KeyError
 
-        cond = [
-            0 <= nxt_row < M,
-            0 <= nxt_col < N,
-            grid[nxt_row, nxt_col] != 1,
-        ]
+        cond = [0 <= nxt_row < M, 0 <= nxt_col < N, grid[nxt_row, nxt_col] != 1]
         if all(cond):
             cell_lst.append((nxt_row, nxt_col))
-            assert act_cost is not None
+            assert act_cost is not None, "act_cost is no assigned"
             cost_lst.append(act_cost)
             dir_lst.append(directions[name])
 
     return cell_lst, cost_lst, dir_lst
 
 
-def dijkstra(s: Union[tuple, np.ndarray], grid, direction):
+########################################
+########################################
+
+def dijkstra(
+        s: Union[tuple, np.ndarray],
+        grid: np.ndarray,
+        direction: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Dijkstra's Algorithm
     :param s: index of starting node
@@ -209,7 +219,11 @@ def dijkstra(s: Union[tuple, np.ndarray], grid, direction):
     :param direction: agent's dir_vec
     return distance grid map
     """
+    assert isinstance(grid, np.ndarray)
+    assert isinstance(direction, np.ndarray)
     m, n = grid.shape
+    assert isinstance(s, np.ndarray) or isinstance(s, tuple) or isinstance(s, list)
+    assert len(s) == 2
     assert 0 <= s[0] <= m and 0 <= s[1] <= n
     # init
     pq = PriorityQueue()
@@ -244,19 +258,33 @@ def dijkstra(s: Union[tuple, np.ndarray], grid, direction):
     return dist, prev_grid
 
 
-def find_shortest_path(s: Union[tuple, np.ndarray], e: Union[tuple, np.ndarray], grid: np.ndarray, direction: np.ndarray):
+########################################
+########################################
+
+def find_shortest_path(
+        s: Union[tuple, np.ndarray],
+        e: Union[tuple, np.ndarray],
+        grid: np.ndarray,
+        direction: np.ndarray
+) -> List[Tuple[int]]:
     """
     shortest distance between 's' and 'e'
+    :param s: start pos
+    :param e; end pos
+    :param grid: binary grid
+    :param direction: direction of agent
+    return: path exclude the end node
     """
     dist, prev_grid = dijkstra(s, grid, direction)
     path = []
     e = tuple(e)
-    # if shortest dist is inf -> no path found
+    # If shortest dist is inf -> no path found
     if dist[e] == np.inf:
+        print("No Path Found!")
         return path
 
-    path.append(e)
-    # exhaust to reconstruct reverse path
+    # path.append(e)
+    # Exhaust to reconstruct reverse path
     while True:
         pre = prev_grid[e]
         if pre == -1:
@@ -264,17 +292,24 @@ def find_shortest_path(s: Union[tuple, np.ndarray], e: Union[tuple, np.ndarray],
         else:
             e = pre
             path.append(pre)
-
+    # Reverse the order to go from s to e
     path.reverse()
     return path
 
 
-def action_recon(path, init_dir):
+def action_recon(path: List[Tuple[int]], init_dir: np.ndarray):
+    """
+    Reconstruct the Action Sequence from Path
+    :param path: list of agent path
+    :param init_dir: agent direction
+    return act_seq: a list of control sequence
+    """
+
     directions = {
-        "up": np.array([-1, 0], dtype=np.int8),  # up
-        "down": np.array([1, 0], dtype=np.int8),  # down
-        "left": np.array([0, -1], dtype=np.int8),  # left
-        "right": np.array([0, 1], dtype=np.int8),  # right
+        "up":    np.array([-1, 0], dtype=np.int8),
+        "down":  np.array([1, 0], dtype=np.int8),
+        "left":  np.array([0, -1], dtype=np.int8),
+        "right": np.array([0, 1], dtype=np.int8),
     }
     inv_dir_dict = {tuple(v): k for k, v in directions.items()}
     act_seq = []
@@ -358,50 +393,30 @@ def action_recon(path, init_dir):
                 raise KeyError
         c_dir = nxt_dir
         act_seq.append(act.MF)
+
     return act_seq
 ########################################
 ########################################
 
-def step_cost(env, action: int):
+
+def step_cost(action: int):
     """
     stage cost
-    :param env:
     :param action:
     :return cost of action
     """
-    assert isinstance(action, int), "action should be integer"
+    assert isinstance(action, int)
     assert 0 <= action <= 4, "action should in [0, 4]"
 
-    front_cell_type: Union[Door, Wall, Key, Goal, None]
-
-    state_cost = {
-        "None": 0,
-        "Wall": np.inf,
-        "Goal": 0
-    }
     action_cost = {
-        "MF": 1,
-        "TL": 1,
-        "TR": 1,
-        "PK": 1,
-        "UD": 1
+        0: 1,   # MF:0 Move Forward
+        1: 1,   # TL:1 Turn Left
+        2: 1,   # TR:2 Turn Right
+        3: 1,   # PK:3 Pickup Key
+        4: 1    # UD:4 Unlock Door
     }
-    # Get the cell in front of the agent
-    front_cell_pos = env.front_pos  # agent_pos + agent_dir
 
-    if action == act.MF:
-        front_cell_type = env.grid.get(front_cell_pos[0], front_cell_pos[1])
-        cost = action_cost["MF"]
-        if isinstance(front_cell_type, Wall):
-            cost += state_cost["Wall"]
-        elif isinstance(front_cell_type, Goal):
-            cost += state_cost["Goal"]
-        else:
-            cost += state_cost["None"]
-    else:
-        cost = 1
-    ic(cost)
-    return cost
+    return action_cost[action]
 
 
 def step(env, action: int, render=False, verbose=False):
@@ -415,6 +430,7 @@ def step(env, action: int, render=False, verbose=False):
         3 # Pickup the key (PK)
         4 # Unlock the door (UD)
     """
+    assert isinstance(action, int), "action should be integer"
     actions = {
         0: env.actions.forward,
         1: env.actions.left,
@@ -428,21 +444,26 @@ def step(env, action: int, render=False, verbose=False):
     # Get the cell in front of the agent
     front_cell_pos = env.front_pos  # agent_pos + agent_dir
     front_cell_type = env.grid.get(front_cell_pos[0], front_cell_pos[1])
-    if isinstance(front_cell_type, Wall):
-        msg = 'Wall'
-    elif isinstance(front_cell_type, Goal):
-        msg = "Goal"
-    elif isinstance(front_cell_type, Door):
-        msg = "Door"
-    elif isinstance(front_cell_type, Key):
-        msg = "Key"
-    else:
-        msg = "None"
-    print(f"Front Cell: {msg}")
-    ic(done)
+
+    if verbose:
+        if isinstance(front_cell_type, Wall):
+            msg = 'Wall'
+        elif isinstance(front_cell_type, Goal):
+            msg = "Goal"
+        elif isinstance(front_cell_type, Door):
+            msg = "Door"
+        elif isinstance(front_cell_type, Key):
+            msg = "Key"
+        else:
+            msg = "None"
+        is_carrying = True if env.carrying is not None else False
+        print(f"Front Cell: {msg}")
+        print(f"Carry Key: {is_carrying}")
+        print(f"Done: {done}")
+
     if render:
         plot_env(env)
-    return step_cost(env, action), done
+    return step_cost(action), done
 
 
 def generate_random_env(seed, task: str):
