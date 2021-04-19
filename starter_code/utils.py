@@ -2,9 +2,11 @@ from typing import List, Tuple, Dict, Union, Optional, Sequence, Iterable
 import os
 import re
 import time
+import random
 import pickle
 from pprint import pprint
 from collections import namedtuple
+from queue import PriorityQueue
 
 import numpy as np
 import gym
@@ -13,12 +15,13 @@ from gym_minigrid.minigrid import MiniGridEnv, Door, Wall, Key, Goal
 
 import matplotlib.pyplot as plt
 import imageio
-import random
 
+from icecream import ic
 
 Action = namedtuple('Action', ['MF', 'TL', 'TR', 'PK', 'UD'])
 act = Action(0, 1, 2, 3, 4)
 act_dict = act._asdict()
+inv_act_dict = {v: k for k, v in act_dict.items()}
 MF = 0  # Move Forward
 TL = 1  # Turn Left
 TR = 2  # Turn Right
@@ -89,10 +92,6 @@ def init_agent_status(env, info: dict):
     init_front_pos = init_agent_pos + init_agent_dir
     # Front type
     init_front_type = env.grid.get(init_front_pos[0], init_front_pos[1])
-    ic(init_agent_pos)
-    ic(init_agent_dir)
-    ic(init_front_pos)
-    ic(init_front_type)
     return init_agent_pos, init_agent_dir, init_front_pos, init_front_type
 
 
@@ -107,11 +106,259 @@ def init_door_status(env: MiniGridEnv, info: dict):
         is_locked = 1
     else:  # door condition is unknown
         is_locked = -1
-    ic(init_door_pos)
-    ic(is_locked)
     return env_door, init_door_pos, is_locked
 
 
+########################################
+########################################
+def fetch_neighbor_cells(pos: Union[tuple, np.ndarray], grid: np.ndarray, c_dir: np.ndarray):
+    """
+    Valid neighbor cells
+    :param pos: current position
+    :param grid: binary grid empty 0 and 1 obstacles
+    :param c_dir: agent's dir_vec
+    :return valid adjacent cells (4-connectivity)
+    """
+    M, N = grid.shape
+    assert 0 <= pos[0] < M and 0 <= pos[1] < N
+    directions = {
+        "up": np.array([-1, 0], dtype=np.int8),  # up
+        "down": np.array([1, 0], dtype=np.int8),  # down
+        "left": np.array([0, -1], dtype=np.int8),  # left
+        "right": np.array([0, 1], dtype=np.int8),  # right
+    }
+    c_row, c_col = pos
+    cell_lst = []
+    cost_lst=[]
+    dir_lst = []
+    act_cost = None
+
+    for name in directions.keys():
+        nxt_row, nxt_col = c_row + directions[name][0], c_col + directions[name][1]
+        # UP
+        if c_dir[0] == directions['up'][0] and c_dir[1] == directions['up'][1]:
+            if name == 'up':
+                act_cost = 0
+            elif name == "down":
+                act_cost = 2
+            elif name == "left":
+                act_cost = 1
+            elif name == "right":
+                act_cost = 1
+            else:
+                raise KeyError
+
+        # DOWN
+        if c_dir[0] == directions['down'][0] and c_dir[1] == directions['down'][1]:
+            if name == 'up':
+                act_cost = 2
+            elif name == "down":
+                act_cost = 0
+            elif name == "left":
+                act_cost = 1
+            elif name == "right":
+                act_cost = 1
+            else:
+                raise KeyError
+
+        # LEFT
+        if c_dir[0] == directions['left'][0] and c_dir[1] == directions['left'][1]:
+            if name == 'up':
+                act_cost = 1
+            elif name == "down":
+                act_cost = 1
+            elif name == "left":
+                act_cost = 0
+            elif name == "right":
+                act_cost = 2
+            else:
+                raise KeyError
+
+        # RIGHT
+        if c_dir[0] == directions['right'][0] and c_dir[1] == directions['right'][1]:
+            if name == 'up':
+                act_cost = 1
+            elif name == "down":
+                act_cost = 1
+            elif name == "left":
+                act_cost = 2
+            elif name == "right":
+                act_cost = 0
+            else:
+                raise KeyError
+
+        cond = [
+            0 <= nxt_row < M,
+            0 <= nxt_col < N,
+            grid[nxt_row, nxt_col] != 1,
+        ]
+        if all(cond):
+            cell_lst.append((nxt_row, nxt_col))
+            assert act_cost is not None
+            cost_lst.append(act_cost)
+            dir_lst.append(directions[name])
+
+    return cell_lst, cost_lst, dir_lst
+
+
+def dijkstra(s: Union[tuple, np.ndarray], grid, direction):
+    """
+    Dijkstra's Algorithm
+    :param s: index of starting node
+    :param grid: 0 empty and 1 obstacles
+    :param direction: agent's dir_vec
+    return distance grid map
+    """
+    m, n = grid.shape
+    assert 0 <= s[0] <= m and 0 <= s[1] <= n
+    # init
+    pq = PriorityQueue()
+    dist = np.empty_like(grid, dtype=np.float32)
+    dist.fill(np.inf)
+    s = tuple(s)
+    dist[s] = 0
+
+    # gird cell points to previous loc
+    prev_grid = np.ones_like(grid, dtype=object) * -1
+    visited = set()
+
+    pq.put_nowait((s, dist[s[0], s[1]], direction))
+    while not pq.empty():
+        index, minValue, c_dir = pq.get_nowait()
+        visited.add(index)
+
+        # ignore outdated (index, dist) pair
+        if dist[index] < minValue:
+            continue
+
+        neighbor_cells, costs, new_dirs = fetch_neighbor_cells(pos=index, grid=grid, c_dir=c_dir)
+
+        for neighbor_cell, cost, new_dir in zip(neighbor_cells, costs, new_dirs):
+            if neighbor_cell not in visited:
+                edge_cost = cost + 1
+                newDist = dist[index] + edge_cost
+                if newDist < dist[neighbor_cell]:
+                    prev_grid[neighbor_cell] = index
+                    dist[neighbor_cell] = newDist
+                    pq.put_nowait((neighbor_cell, newDist, new_dir))
+    return dist, prev_grid
+
+
+def find_shortest_path(s: Union[tuple, np.ndarray], e: Union[tuple, np.ndarray], grid: np.ndarray, direction: np.ndarray):
+    """
+    shortest distance between 's' and 'e'
+    """
+    dist, prev_grid = dijkstra(s, grid, direction)
+    path = []
+    e = tuple(e)
+    # if shortest dist is inf -> no path found
+    if dist[e] == np.inf:
+        return path
+
+    path.append(e)
+    # exhaust to reconstruct reverse path
+    while True:
+        pre = prev_grid[e]
+        if pre == -1:
+            break
+        else:
+            e = pre
+            path.append(pre)
+
+    path.reverse()
+    return path
+
+
+def action_recon(path, init_dir):
+    directions = {
+        "up": np.array([-1, 0], dtype=np.int8),  # up
+        "down": np.array([1, 0], dtype=np.int8),  # down
+        "left": np.array([0, -1], dtype=np.int8),  # left
+        "right": np.array([0, 1], dtype=np.int8),  # right
+    }
+    inv_dir_dict = {tuple(v): k for k, v in directions.items()}
+    act_seq = []
+
+    c_dir = init_dir
+    for i in range(1, len(path)):
+        c_cell = np.array(path[i-1], dtype=np.int8)
+        nxt_cell = np.array(path[i], dtype=np.int8)
+        nxt_dir = nxt_cell - c_cell
+        # ic(nxt_dir)
+
+        name = inv_dir_dict[tuple(nxt_dir)]
+        # ic(name)
+
+        # UP
+        if c_dir[0] == directions['up'][0] and c_dir[1] == directions['up'][1]:
+            if name == 'up':
+                act_cost = 0
+            elif name == "down":
+                act_cost = 2
+                act_seq.append(act.TL)
+                act_seq.append(act.TL)
+            elif name == "left":
+                act_cost = 1
+                act_seq.append(act.TL)
+            elif name == "right":
+                act_cost = 1
+                act_seq.append(act.TR)
+            else:
+                raise KeyError
+
+        # DOWN
+        if c_dir[0] == directions['down'][0] and c_dir[1] == directions['down'][1]:
+            if name == 'up':
+                act_cost = 2
+                act_seq.append(act.TL)
+                act_seq.append(act.TL)
+            elif name == "down":
+                act_cost = 0
+            elif name == "left":
+                act_cost = 1
+                act_seq.append(act.TR)
+            elif name == "right":
+                act_cost = 1
+                act_seq.append(act.TL)
+            else:
+                raise KeyError
+
+        # LEFT
+        if c_dir[0] == directions['left'][0] and c_dir[1] == directions['left'][1]:
+            if name == 'up':
+                act_cost = 1
+                act_seq.append(act.TR)
+            elif name == "down":
+                act_cost = 1
+                act_seq.append(act.TL)
+            elif name == "left":
+                act_cost = 0
+            elif name == "right":
+                act_cost = 2
+                act_seq.append(act.TL)
+                act_seq.append(act.TL)
+            else:
+                raise KeyError
+
+        # RIGHT
+        if c_dir[0] == directions['right'][0] and c_dir[1] == directions['right'][1]:
+            if name == 'up':
+                act_cost = 1
+                act_seq.append(act.TL)
+            elif name == "down":
+                act_cost = 1
+                act_seq.append(act.TR)
+            elif name == "left":
+                act_cost = 2
+                act_seq.append(act.TL)
+                act_seq.append(act.TL)
+            elif name == "right":
+                act_cost = 0
+            else:
+                raise KeyError
+        c_dir = nxt_dir
+        act_seq.append(act.MF)
+    return act_seq
 ########################################
 ########################################
 
