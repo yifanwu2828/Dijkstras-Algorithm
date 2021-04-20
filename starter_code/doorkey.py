@@ -512,10 +512,10 @@ if __name__ == '__main__':
         ############################
         print(f'<========================>')
         opt_act_seq, opt_act_name = doorkey_random_partB(env, info, verbose=True)
+        # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/random/doorkey{i}.gif')
         for ac in opt_act_seq:
             try:
-                utils.step(env, ac, render=True)
+                utils.step(env, ac, render=False)
             except KeyboardInterrupt:
                 sys.exit(0)
         print('<===============================>\n')
-
