@@ -117,6 +117,7 @@ def doorkey_partA(env: MiniGridEnv, info: dict, verbose=False):
     # Act Seq Start -> Key
     act_seq_start2key, dir_seq_start2key, cost_seq_start2key = utils.action_recon(path=path_recon_start2key,
                                                                                   init_dir=init_agent_dir)
+    # act steps into key's pos
     act_seq_start2key.insert(-1, act.PK)
     dir_seq_start2key.insert(-1, dir_seq_start2key[-1])
     cost_seq_start2key.insert(-1, 1)
@@ -126,6 +127,7 @@ def doorkey_partA(env: MiniGridEnv, info: dict, verbose=False):
     dir_seq_start2key.pop(-1)
     cost_seq_start2key.pop(-1)
 
+    # obtain pos and dir before MF to key pos
     last_pos = path_recon_start2key[-2]
     last_dir = dir_seq_start2key[-1]
 
@@ -260,6 +262,7 @@ def doorkey_random_partB(env: MiniGridEnv, info: dict, verbose=False):
 
     # Start to Goal
     dist_from_start, prev_start = utils.dijkstra(s=init_agent_pos, grid=binary_grid_carried, direction=init_agent_dir)
+    # ic(dist_from_start)
     path_recon_start2goal = utils.find_shortest_path(
         s=init_agent_pos,
         e=goal_pos,
@@ -294,6 +297,14 @@ def doorkey_random_partB(env: MiniGridEnv, info: dict, verbose=False):
     cost_seq_start2key.insert(-1, 1)
     act_name_start2key = [inv_act_dict[i] for i in act_seq_start2key]
 
+    act_seq_start2key.pop(-1)
+    dir_seq_start2key.pop(-1)
+    cost_seq_start2key.pop(-1)
+
+    # obtain pos and dir before MF to key pos
+    last_pos = path_recon_start2key[-2]
+    last_dir = dir_seq_start2key[-1]
+
     start2key = dist_from_start[tuple(key_pos)]
     cost_start2key = sum(cost_seq_start2key)
     # ic(cost_start2key)
@@ -301,10 +312,10 @@ def doorkey_random_partB(env: MiniGridEnv, info: dict, verbose=False):
     # Key to Door 1
     dist_from_key, prev_key = utils.dijkstra(s=key_pos, grid=binary_grid_one_open, direction=dir_seq_start2key[-1][-1])
     path_recon_key2door1 = utils.find_shortest_path(
-        s=key_pos,
+        s=last_pos,
         e=door_pos1,
         grid=binary_grid_one_open,
-        direction=dir_seq_start2key[-1][-1]
+        direction=last_dir[-1]
     )
     # Act Seq Key -> Door1
     act_seq_key2door1, dir_seq_key2door1, cost_seq_key2door1 = utils.action_recon(path=path_recon_key2door1,
@@ -320,10 +331,10 @@ def doorkey_random_partB(env: MiniGridEnv, info: dict, verbose=False):
 
     # key to door2
     path_recon_key2door2 = utils.find_shortest_path(
-        s=key_pos,
+        s=last_pos,
         e=door_pos2,
         grid=binary_grid_two_open,
-        direction=dir_seq_start2key[-1][-1]
+        direction=last_dir[-1]
     )
     # Act Seq Key -> Door2
     act_seq_key2door2, dir_seq_key2door2, cost_seq_key2door2 = utils.action_recon(path=path_recon_key2door2,
@@ -455,9 +466,8 @@ if __name__ == '__main__':
 
     ############################
     # Config
-    # A = False
-    B = False
     A = True
+    B = True
     TEST = args.test
     VERBOSE = args.verbose
     # VERBOSE = False
@@ -502,11 +512,11 @@ if __name__ == '__main__':
                 if args.render:
                     utils.plot_env(env)
             print(f'<=========== {key} =============>')
-            opt_act_seq, opt_act_name = doorkey_partA(env, info, verbose=args.render)
-            utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/doorkey_{key}_demo.gif')
+            opt_act_seq, opt_act_name = doorkey_partA(env, info, verbose=False)
+            # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/doorkey_{key}_demo.gif')
             for ac in opt_act_seq:
                 try:
-                    utils.step(env, ac, render=False)
+                    utils.step(env, ac, render=args.render)
                 except KeyboardInterrupt:
                     sys.exit(0)
             print('<===============================>\n')
@@ -527,15 +537,17 @@ if __name__ == '__main__':
                 pprint(info)  # Map size
                 print('<===========================>')
                 # Visualize the environment
-                utils.plot_env(env)
+                if args.render:
+                    utils.plot_env(env)
             ############################
             ############################
             print(f'<========================>')
-            opt_act_seq, opt_act_name = doorkey_random_partB(env, info, verbose=True)
+            opt_act_seq, opt_act_name = doorkey_random_partB(env, info, verbose=False)
             # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/random/doorkey{i}.gif')
             for ac in opt_act_seq:
                 try:
-                    utils.step(env, ac, render=False)
+                    utils.step(env, ac, render=args.render)
                 except KeyboardInterrupt:
                     sys.exit(0)
             print('<===============================>\n')
+    print("Done!")
