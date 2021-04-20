@@ -57,7 +57,7 @@ def toc(t_start: float, name: Optional[str] = "Operation", ftime=False) -> None:
 
 ########################################################################################
 
-def fetch_env_dict(env_folder: str = './envs', verbose=False) -> Dict[str, str]:
+def fetch_env_dict(env_folder: str = './envs', verbose=False) -> Tuple[Dict[str, str], List[str]]:
     """
     :param env_folder: folder contain .env files
     :param verbose: show msg
@@ -72,13 +72,15 @@ def fetch_env_dict(env_folder: str = './envs', verbose=False) -> Dict[str, str]:
         ]
     )
     path_dic = {}
+    name_lst = []
     for path in env_path_lst:
         frac = re.split('[.-]', path)
         name = frac[2] + '-' + frac[3]
+        name_lst.append(name)
         path_dic[name] = path
     if verbose:
         pprint(path_dic)
-    return path_dic
+    return path_dic, name_lst
 
 
 ########################################
