@@ -278,7 +278,7 @@ def find_shortest_path(
     return: path exclude the end node
     """
     dist, prev_grid = dijkstra(s, grid, direction)
-    path = []
+    path: List[Tuple[int]] = []
     e = tuple(e)
     # If shortest dist is inf -> no path found
     if dist[e] == np.inf:
@@ -302,7 +302,7 @@ def find_shortest_path(
 def action_recon(
         path: List[Tuple[int]],
         init_dir: np.ndarray
-) -> Tuple[List[int], List[Tuple[str, np.ndarray]], List[int]]:
+) -> Tuple[List[int], List[Tuple[str, np.ndarray]], List[Optional[int]]]:
     """
     Reconstruct the Action Sequence from Path
     :param path: list of agent path
@@ -319,8 +319,8 @@ def action_recon(
     inv_dir_dict: Dict[tuple, str] = {tuple(v): k for k, v in directions.items()}
     act_seq: List[int] = []
     dir_seq: List[Tuple[str, np.ndarray]] = []
-    cost_seq: List[int] = []
-    act_cost = None
+    cost_seq: List[Optional[int]] = []
+    act_cost: Optional[int] = None
 
     # Record initial agent_dir name and value
     for k, v in directions.items():

@@ -2,23 +2,23 @@ import argparse
 import os.path
 from typing import Union, List
 from collections import namedtuple
-
 import random
+from pprint import pprint
 
 import numpy as np
 import gym
 from gym_minigrid import minigrid
 from gym_minigrid.minigrid import MiniGridEnv, Door, Wall, Key, Goal
-from icecream import ic
-from pprint import pprint
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 
 import utils
 
 Action = namedtuple('Action', ['MF', 'TL', 'TR', 'PK', 'UD'])
 act = Action(0, 1, 2, 3, 4)
-
-act_dict = act._asdict()
-inv_act_dict = {v: k for k, v in act_dict.items()}
 # {
 #     MF: 0,  # Move Forward
 #     TL: 1,  # Turn Left
@@ -26,6 +26,9 @@ inv_act_dict = {v: k for k, v in act_dict.items()}
 #     PK: 3,  # Pickup Key
 #     UD: 4,  # Unlock Door
 # }
+act_dict = act._asdict()
+inv_act_dict = {v: k for k, v in act_dict.items()}
+
 # Map of object type to integers
 OBJECT_TO_IDX = {
     'empty': 1,
@@ -92,19 +95,12 @@ def doorkey_partA(env: MiniGridEnv, info: dict, verbose=False):
         grid=binary_grid,
         direction=init_agent_dir
     )
-    # Act Seq Start -> Key
+    # Act Seq Start -> Goal
     act_seq_start2goal, dir_seq_start2goal, cost_seq_start2goal = utils.action_recon(path=path_recon_start2goal,
                                                                                      init_dir=init_agent_dir)
     act_name_start2goal = [inv_act_dict[i] for i in act_seq_start2goal]
-    if verbose:
-        assert len(act_seq_start2goal) == len(act_name_start2goal)
-        for p, name in enumerate(act_name_start2goal):
-            assert act_dict[name] == act_seq_start2goal[p]
-    # ic(path_recon_start2goal)
-    # ic(act_seq_start2goal)
-    # ic(act_name_start2goal)
-    # ic(dir_seq_start2goal)
-    # ic(cost_seq_start2goal)
+
+    cost_start2goal = sum(cost_seq_start2goal)
 
     ####################################
     ####################################
@@ -124,19 +120,10 @@ def doorkey_partA(env: MiniGridEnv, info: dict, verbose=False):
     dir_seq_start2key.insert(-1, dir_seq_start2key[-1])
     cost_seq_start2key.insert(-1, 1)
     act_name_start2key = [inv_act_dict[i] for i in act_seq_start2key]
-    if verbose:
-        assert len(act_seq_start2key) == len(act_name_start2key)
-        for p, name in enumerate(act_name_start2key):
-            assert act_dict[name] == act_seq_start2key[p]
-    # ic(path_recon_start2key)
-    # ic(act_seq_start2key)
-    # ic(act_name_start2key)
-    # ic(dir_seq_start2key)
-    # ic(cost_seq_start2key)
+    cost_start2key = sum(cost_seq_start2key)
 
     # Key to Door
     dist_from_key, prev_key = utils.dijkstra(s=key_pos, grid=binary_grid_open, direction=dir_seq_start2key[-1][-1])
-
     path_recon_key2door = utils.find_shortest_path(
         s=key_pos,
         e=door_pos,
@@ -150,17 +137,7 @@ def doorkey_partA(env: MiniGridEnv, info: dict, verbose=False):
     dir_seq_key2door.insert(-1, dir_seq_key2door[-1])
     cost_seq_key2door.insert(-1, 1)
     act_name_key2door = [inv_act_dict[j] for j in act_seq_key2door]
-    if verbose:
-        assert len(act_seq_key2door) == len(act_name_key2door)
-        for p, name in enumerate(act_name_key2door):
-            assert act_dict[name] == act_seq_key2door[p]
-
-    # ic(dist_from_key)
-    # ic(path_recon_key2door)
-    # ic(act_seq_key2door)
-    # ic(act_name_key2door)
-    # ic(dir_seq_key2door)
-    # ic(cost_seq_key2door)
+    cost_key2door = sum(cost_seq_key2door)
 
     ####################################
     ####################################
@@ -177,17 +154,7 @@ def doorkey_partA(env: MiniGridEnv, info: dict, verbose=False):
     act_seq_door2goal, dir_seq_door2goal, cost_seq_door2goal = utils.action_recon(path=path_recon_door2goal,
                                                                                   init_dir=dir_seq_key2door[-1][-1])
     act_name_door2goal = [inv_act_dict[k] for k in act_seq_door2goal]
-    if verbose:
-        assert len(act_seq_door2goal) == len(act_name_door2goal)
-        for p, name in enumerate(act_name_door2goal):
-            assert act_dict[name] == act_seq_door2goal[p]
-
-    # ic(dist_from_door)
-    # ic(path_recon_door2goal)
-    # ic(act_seq_door2goal)
-    # ic(act_name_door2goal)
-    # ic(dir_seq_door2goal)
-    # ic(cost_seq_door2goal)
+    cost_door2goal = sum(cost_seq_door2goal)
 
     ####################################
     ####################################
@@ -250,6 +217,8 @@ if __name__ == '__main__':
 
     ############################
     # Config
+    A = False
+    A = True
     TEST = args.test
     VERBOSE = args.verbose
     # VERBOSE = False
@@ -267,23 +236,35 @@ if __name__ == '__main__':
     random.seed(seed)
     np.random.seed(seed)
     ############################
-    # Obtain env path
-    # env_dict, env_name = utils.fetch_env_dict(env_folder, verbose=VERBOSE)
-    # env, info = utils.load_env(env_dict["5x5-normal"])      # pass
-    # env, info = utils.load_env(env_dict["6x6-direct"])      # pass
-    # env, info = utils.load_env(env_dict["6x6-normal"])      # pass
-    # env, info = utils.load_env(env_dict["6x6-shortcut"])    # pass
-    # env, info = utils.load_env(env_dict["8x8-direct"])      # pass
-    # env, info = utils.load_env(env_dict["8x8-normal"])      # pass
-    # env, info = utils.load_env(env_dict["8x8-shortcut"])    # pass
+    # Part A
+    if A:
+        # Obtain env path
+        env_dict, env_name = utils.fetch_env_dict(env_folder, verbose=VERBOSE)
+        # env_5x5_normal, info_5x5_normal = utils.load_env(env_dict["5x5-normal"])      # pass
+        # env_6x6_direct, info_6x6_direct = utils.load_env(env_dict["6x6-direct"])      # pass
+        # env_6x6_normal, info_6x6_normal = utils.load_env(env_dict["6x6-normal"])      # pass
+        # env_6x6_shortcut, info_6x6_shortcut = utils.load_env(env_dict["6x6-shortcut"])    # pass
+        # env_8x8_direct, info_8x8_direct = utils.load_env(env_dict["8x8-direct"])      # pass
+        # env_8x8_normal, info_8x8_normal = utils.load_env(env_dict["8x8-normal"])      # pass
+        # env_8x8_shortcut, info_8x8_shortcut = utils.load_env(env_dict["8x8-shortcut"])    # pass
+        env_lst = []
+        for key, value in env_dict.items():
+            env, info = utils.load_env(value)
+            env_lst.append((env, info, key))
 
+        for x in env_lst:
+            env, info, key = x
+            print(f'<=========== {key} =============>')
+            opt_act_seq, opt_act_name = doorkey_partA(env, info, verbose=True)
+            print('<===============================>\n')
+    ############################
+    ############################
 
+    # Part B
     random_env_folder = os.path.join(env_folder, "random_envs")
-
     env, info, env_path = utils.load_random_env(random_env_folder)
     env.seed = seed
     print(env_path)
-
 
     if VERBOSE:
         print('\n<=====Environment Info =====>')
@@ -294,20 +275,6 @@ if __name__ == '__main__':
         utils.plot_env(env)
     ############################
     ############################
-    # opt_act_seq, opt_act_name = doorkey_partA(env, info, verbose=True)
-
-    # ep_cost = 0
-    # done = False
-    # for t, ac in enumerate(opt_act_seq):
-    #     cost, done = utils.step(env, action=ac, render=True, verbose=True)
-    #     ep_cost += cost
-    #     # Determine whether we stepped into the goal
-    #     if done:
-    #         print("\nReached Goal\n")
-    #
-    # # The number of steps so far
-    # print(f'Step Count: {env.step_count}')
-    # print(f"Episode Cost: {ep_cost}")
 
     # agent info
     init_agent_pos = np.flip(info["init_agent_pos"])
@@ -337,21 +304,21 @@ if __name__ == '__main__':
     binary_grid[tuple(door_pos1)] = door1_is_locked
     binary_grid[tuple(door_pos2)] = door2_is_locked
     binary_grid[tuple(key_pos)] = 1
-    ic(binary_grid)
+    # ic(binary_grid)
 
     # binary_grid with door locked key carried
     binary_grid_carried = binary_grid.copy()
     binary_grid_carried[tuple(key_pos)] = 0
     binary_grid[tuple(door_pos1)] = door1_is_locked
     binary_grid[tuple(door_pos2)] = door2_is_locked
-    ic(binary_grid_carried)
+    # ic(binary_grid_carried)
 
     # binary_grid with door1 open key used
     binary_grid_one_open = binary_grid.copy()
     binary_grid_one_open[tuple(door_pos1)] = 0
     binary_grid_one_open[tuple(door_pos2)] = 1
     binary_grid_one_open[tuple(key_pos)] = 0
-    ic(binary_grid_one_open)
+    # ic(binary_grid_one_open)
 
 
     # binary_grid with door2 open key used
@@ -359,7 +326,7 @@ if __name__ == '__main__':
     binary_grid_two_open[tuple(door_pos1)] = 1
     binary_grid_two_open[tuple(door_pos2)] = 0
     binary_grid_two_open[tuple(key_pos)] = 0
-    ic(binary_grid_two_open)
+    # ic(binary_grid_two_open)
 
 
     # binary_grid with both door open key used
@@ -367,7 +334,34 @@ if __name__ == '__main__':
     binary_grid_both_open[tuple(door_pos1)] = 0
     binary_grid_both_open[tuple(door_pos2)] = 0
     binary_grid_both_open[tuple(key_pos)] = 0
-    ic(binary_grid_both_open)
+    # ic(binary_grid_both_open)
+
+    # Start to Goal
+    dist_from_start, prev_start = utils.dijkstra(s=init_agent_pos, grid=binary_grid_carried, direction=init_agent_dir)
+    path_recon_start2goal = utils.find_shortest_path(
+        s=init_agent_pos,
+        e=goal_pos,
+        grid=binary_grid,
+        direction=init_agent_dir
+    )
+    # Act Seq Start -> Goal
+    act_seq_start2goal, dir_seq_start2goal, cost_seq_start2goal = utils.action_recon(path=path_recon_start2goal,
+                                                                                     init_dir=init_agent_dir)
+    act_name_start2goal = [inv_act_dict[i] for i in act_seq_start2goal]
+
+    assert len(act_seq_start2goal) == len(act_name_start2goal)
+    for p, name in enumerate(act_name_start2goal):
+        assert act_dict[name] == act_seq_start2goal[p]
+    start2goal = dist_from_start[tuple(goal_pos)]
+    ic(path_recon_start2goal)
+    ic(act_seq_start2goal)
+    ic(act_name_start2goal)
+    ic(dir_seq_start2goal)
+    ic(cost_seq_start2goal)
+    ic(sum(cost_seq_start2goal))
+
+
+
 
     # Both Door Open
     if door1_is_locked == 0 and door2_is_locked == 0:
