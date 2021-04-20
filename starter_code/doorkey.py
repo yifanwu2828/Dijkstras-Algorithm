@@ -113,24 +113,32 @@ def doorkey_partA(env: MiniGridEnv, info: dict, verbose=False):
         grid=binary_grid_carried,
         direction=init_agent_dir
     )
-
+    ic(path_recon_start2key)
     # Act Seq Start -> Key
     act_seq_start2key, dir_seq_start2key, cost_seq_start2key = utils.action_recon(path=path_recon_start2key,
-
                                                                                   init_dir=init_agent_dir)
     act_seq_start2key.insert(-1, act.PK)
     dir_seq_start2key.insert(-1, dir_seq_start2key[-1])
     cost_seq_start2key.insert(-1, 1)
+
+    # Remove MF
+    act_seq_start2key.pop(-1)
+    dir_seq_start2key.pop(-1)
+    cost_seq_start2key.pop(-1)
+
+    last_pos = path_recon_start2key[-2]
+    last_dir = dir_seq_start2key[-1]
+
     act_name_start2key = [inv_act_dict[i] for i in act_seq_start2key]
     cost_start2key = sum(cost_seq_start2key)
 
     # Key to Door
-    dist_from_key, prev_key = utils.dijkstra(s=key_pos, grid=binary_grid_open, direction=dir_seq_start2key[-1][-1])
+    dist_from_key, prev_key = utils.dijkstra(s=last_pos, grid=binary_grid_open, direction=last_dir[-1])
     path_recon_key2door = utils.find_shortest_path(
-        s=key_pos,
+        s=last_pos,
         e=door_pos,
         grid=binary_grid_open,
-        direction=dir_seq_start2key[-1][-1]
+        direction=last_dir[-1]
     )
     # Act Seq Key -> Door
     act_seq_key2door, dir_seq_key2door, cost_seq_key2door = utils.action_recon(path=path_recon_key2door,
@@ -435,6 +443,7 @@ def doorkey_random_partB(env: MiniGridEnv, info: dict, verbose=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--folder", help="Env folder", type=str, default='./envs')
+    parser.add_argument("-r", "--render", help="Visualize Env", action="store_true", default=False)
     parser.add_argument("--seed", help="Random generator seed", type=int, default=42)
     parser.add_argument("-t", "--test", action="store_true", default=True, help="Test mode")
     parser.add_argument("--logdir", type=str, default="./gif", help="Log directory")
@@ -446,8 +455,9 @@ if __name__ == '__main__':
 
     ############################
     # Config
-    A = False
-    # A = True
+    # A = False
+    B = False
+    A = True
     TEST = args.test
     VERBOSE = args.verbose
     # VERBOSE = False
@@ -480,42 +490,52 @@ if __name__ == '__main__':
         for key, value in env_dict.items():
             env, info = utils.load_env(value)
             env_lst.append((env, info, key))
-
         for x in env_lst:
             env, info, key = x
+            ic(key)
+            if VERBOSE:
+                print('\n<=====Environment Info =====>')
+                print(env.mission)
+                pprint(info)  # Map size
+                print('<===========================>')
+                # Visualize the environment
+                if args.render:
+                    utils.plot_env(env)
             print(f'<=========== {key} =============>')
-            opt_act_seq, opt_act_name = doorkey_partA(env, info, verbose=True)
+            opt_act_seq, opt_act_name = doorkey_partA(env, info, verbose=args.render)
+            utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/doorkey_{key}_demo.gif')
             for ac in opt_act_seq:
                 try:
-                    utils.step(env, ac, render=True)
+                    utils.step(env, ac, render=False)
                 except KeyboardInterrupt:
                     sys.exit(0)
             print('<===============================>\n')
     ############################
     ############################
 
-    # Part B
-    random_env_folder = os.path.join(env_folder, "random_envs")
-    for i in range(30):
-        env, info, env_path = utils.load_random_env(random_env_folder)
-        # env.seed = seed
-        print(env_path)
+    if B:
+        # Part B
+        random_env_folder = os.path.join(env_folder, "random_envs")
+        for i in range(30):
+            env, info, env_path = utils.load_random_env(random_env_folder)
+            # env.seed = seed
+            print(env_path)
 
-        if VERBOSE:
-            print('\n<=====Environment Info =====>')
-            print(env.mission)
-            pprint(info)  # Map size
-            print('<===========================>')
-            # Visualize the environment
-            utils.plot_env(env)
-        ############################
-        ############################
-        print(f'<========================>')
-        opt_act_seq, opt_act_name = doorkey_random_partB(env, info, verbose=True)
-        # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/random/doorkey{i}.gif')
-        for ac in opt_act_seq:
-            try:
-                utils.step(env, ac, render=False)
-            except KeyboardInterrupt:
-                sys.exit(0)
-        print('<===============================>\n')
+            if VERBOSE:
+                print('\n<=====Environment Info =====>')
+                print(env.mission)
+                pprint(info)  # Map size
+                print('<===========================>')
+                # Visualize the environment
+                utils.plot_env(env)
+            ############################
+            ############################
+            print(f'<========================>')
+            opt_act_seq, opt_act_name = doorkey_random_partB(env, info, verbose=True)
+            # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/random/doorkey{i}.gif')
+            for ac in opt_act_seq:
+                try:
+                    utils.step(env, ac, render=False)
+                except KeyboardInterrupt:
+                    sys.exit(0)
+            print('<===============================>\n')
