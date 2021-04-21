@@ -88,7 +88,9 @@ def doorkey_partA(env: MiniGridEnv, info: dict, verbose=False):
     ####################################
 
     # Start to Goal
-    dist_from_start, prev_start = utils.dijkstra(s=init_agent_pos, grid=binary_grid_carried, direction=init_agent_dir)
+    dist_from_start, prev_start = utils.dijkstra(s=init_agent_pos, grid=binary_grid_carried, direction=init_agent_dir,
+                                                 e=goal_pos)
+    ic(dist_from_start)
     path_recon_start2goal = utils.find_shortest_path(
         s=init_agent_pos,
         e=goal_pos,
@@ -261,7 +263,9 @@ def doorkey_random_partB(env: MiniGridEnv, info: dict, verbose=False):
     # ic(binary_grid_both_open)
 
     # Start to Goal
-    dist_from_start, prev_start = utils.dijkstra(s=init_agent_pos, grid=binary_grid_carried, direction=init_agent_dir)
+    dist_from_start, prev_start = utils.dijkstra(s=init_agent_pos, grid=binary_grid_carried, direction=init_agent_dir,
+                                                 e=goal_pos)
+    ic(dist_from_start)
     # ic(dist_from_start)
     path_recon_start2goal = utils.find_shortest_path(
         s=init_agent_pos,
@@ -470,7 +474,6 @@ if __name__ == '__main__':
     B = True
     TEST = args.test
     VERBOSE = args.verbose
-    # VERBOSE = False
     seed = args.seed
     env_folder = args.folder
     logdir = args.logdir
@@ -489,12 +492,12 @@ if __name__ == '__main__':
     if A:
         # Obtain env path
         env_dict, env_name = utils.fetch_env_dict(env_folder, verbose=VERBOSE)
-        # env_5x5_normal, info_5x5_normal = utils.load_env(env_dict["5x5-normal"])      # pass
-        # env_6x6_direct, info_6x6_direct = utils.load_env(env_dict["6x6-direct"])      # pass
-        # env_6x6_normal, info_6x6_normal = utils.load_env(env_dict["6x6-normal"])      # pass
-        # env_6x6_shortcut, info_6x6_shortcut = utils.load_env(env_dict["6x6-shortcut"])    # pass
-        # env_8x8_direct, info_8x8_direct = utils.load_env(env_dict["8x8-direct"])      # pass
-        # env_8x8_normal, info_8x8_normal = utils.load_env(env_dict["8x8-normal"])      # pass
+        # env_5x5_normal, info_5x5_normal = utils.load_env(env_dict["5x5-normal"])        # pass
+        # env_6x6_direct, info_6x6_direct = utils.load_env(env_dict["6x6-direct"])        # pass
+        # env_6x6_normal, info_6x6_normal = utils.load_env(env_dict["6x6-normal"])        # pass
+        # env_6x6_shortcut, info_6x6_shortcut = utils.load_env(env_dict["6x6-shortcut"])  # pass
+        # env_8x8_direct, info_8x8_direct = utils.load_env(env_dict["8x8-direct"])        # pass
+        # env_8x8_normal, info_8x8_normal = utils.load_env(env_dict["8x8-normal"])        # pass
         # env_8x8_shortcut, info_8x8_shortcut = utils.load_env(env_dict["8x8-shortcut"])    # pass
         env_lst = []
         for key, value in env_dict.items():
@@ -513,6 +516,8 @@ if __name__ == '__main__':
                     utils.plot_env(env)
             print(f'<=========== {key} =============>')
             opt_act_seq, opt_act_name = doorkey_partA(env, info, verbose=False)
+            ic(opt_act_seq)
+            ic(opt_act_name)
             # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/doorkey_{key}_demo.gif')
             for ac in opt_act_seq:
                 try:
@@ -526,7 +531,7 @@ if __name__ == '__main__':
     if B:
         # Part B
         random_env_folder = os.path.join(env_folder, "random_envs")
-        for i in range(30):
+        for i in range(10):
             env, info, env_path = utils.load_random_env(random_env_folder)
             # env.seed = seed
             print(env_path)
@@ -543,6 +548,8 @@ if __name__ == '__main__':
             ############################
             print(f'<========================>')
             opt_act_seq, opt_act_name = doorkey_random_partB(env, info, verbose=False)
+            ic(opt_act_seq)
+            ic(opt_act_name)
             # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/random/doorkey{i}.gif')
             for ac in opt_act_seq:
                 try:

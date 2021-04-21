@@ -212,13 +212,15 @@ def fetch_neighbor_cells(
 def dijkstra(
         s: Union[tuple, np.ndarray],
         grid: np.ndarray,
-        direction: np.ndarray
+        direction: np.ndarray,
+        e: Union[tuple, np.ndarray] = None
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Dijkstra's Algorithm
     :param s: index of starting node
     :param grid: 0 empty and 1 obstacles
     :param direction: agent's dir_vec
+    :param e: index of end node if end node is provide, early stopping is applied
     return distance grid map
     """
     assert isinstance(grid, np.ndarray)
@@ -249,14 +251,19 @@ def dijkstra(
 
         neighbor_cells, costs, new_dirs = fetch_neighbor_cells(pos=index, grid=grid, c_dir=c_dir)
 
+        # for cell in Child node
         for neighbor_cell, cost, new_dir in zip(neighbor_cells, costs, new_dirs):
             if neighbor_cell not in visited:
-                edge_cost = cost + 1
+                edge_cost = cost + 1  # -> transition cost = rotation cost(0,1,2) + MF cost (1)
                 newDist = dist[index] + edge_cost
+                # Label Correcting
                 if newDist < dist[neighbor_cell]:
                     prev_grid[neighbor_cell] = index
                     dist[neighbor_cell] = newDist
                     pq.put_nowait((neighbor_cell, newDist, new_dir))
+        if e is not None and index[0] == e[0] and index[1] == e[1]:
+            return dist, prev_grid
+            # break
     return dist, prev_grid
 
 
