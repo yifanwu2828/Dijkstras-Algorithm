@@ -16,7 +16,10 @@ from gym_minigrid.minigrid import MiniGridEnv, Door, Wall, Key, Goal
 import matplotlib.pyplot as plt
 import imageio
 
-from icecream import ic
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 Action = namedtuple('Action', ['MF', 'TL', 'TR', 'PK', 'UD'])
 act = Action(0, 1, 2, 3, 4)
