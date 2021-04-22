@@ -256,14 +256,13 @@ def dijkstra(
 
         # for cell in Child node
         for neighbor_cell, cost, new_dir in zip(neighbor_cells, costs, new_dirs):
-            if neighbor_cell not in visited:
-                edge_cost = cost + 1  # -> transition cost = rotation cost(0,1,2) + MF cost (1)
-                newDist = dist[index] + edge_cost
-                # Label Correcting
-                if newDist < dist[neighbor_cell]:
-                    prev_grid[neighbor_cell] = index
-                    dist[neighbor_cell] = newDist
-                    pq.put_nowait((neighbor_cell, newDist, new_dir))
+            edge_cost = cost + 1  # -> transition cost = rotation cost(0,1,2) + MF cost (1)
+            newDist = dist[index] + edge_cost
+            # Label Correcting
+            if newDist < dist[neighbor_cell]:
+                prev_grid[neighbor_cell] = index
+                dist[neighbor_cell] = newDist
+                pq.put_nowait((neighbor_cell, newDist, new_dir))
         if e is not None and index[0] == e[0] and index[1] == e[1]:
             return dist, prev_grid
             # break

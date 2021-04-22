@@ -518,7 +518,7 @@ if __name__ == '__main__':
             opt_act_seq, opt_act_name = doorkey_partA(env, info, verbose=False)
             ic(opt_act_seq)
             ic(opt_act_name)
-            # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/doorkey_{key}_demo.gif')
+            utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/doorkey_{key}_demo.gif')
             for ac in opt_act_seq:
                 try:
                     utils.step(env, ac, render=args.render)
@@ -531,7 +531,7 @@ if __name__ == '__main__':
     if B:
         # Part B
         random_env_folder = os.path.join(env_folder, "random_envs")
-        for i in range(10):
+        for i in range(30):
             env, info, env_path = utils.load_random_env(random_env_folder)
             # env.seed = seed
             print(env_path)
@@ -550,7 +550,7 @@ if __name__ == '__main__':
             opt_act_seq, opt_act_name = doorkey_random_partB(env, info, verbose=False)
             ic(opt_act_seq)
             ic(opt_act_name)
-            # utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/random/doorkey{i}.gif')
+            utils.draw_gif_from_seq(seq=opt_act_seq, env=env, path=f'./gif/random/doorkey{i}.gif')
             for ac in opt_act_seq:
                 try:
                     utils.step(env, ac, render=args.render)
