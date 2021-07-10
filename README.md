@@ -1,1 +1,1 @@
-# Dynamic-Programming
+# Dijkstra's Algorithm
